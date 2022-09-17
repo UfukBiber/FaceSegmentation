@@ -3,7 +3,7 @@ import cv2, os
 import numpy as np
 
 
-inputs = tf.keras.Input(shape=(200, 200, 3))
+inputs = tf.keras.Input(shape=(256, 256, 3))
 x = tf.keras.layers.Rescaling(1./255)(inputs)
 x = tf.keras.layers.Conv2D(32, 3, strides=2, activation="relu", padding="same")(x)
 x = tf.keras.layers.Conv2D(64, 3, activation="relu", padding="same")(x)
@@ -22,7 +22,7 @@ x = tf.keras.layers.Conv2DTranspose(32, 3, strides=2, activation="relu", padding
 outputs = tf.keras.layers.Conv2D(1, 3, activation="sigmoid",padding="same")(x)
 model = tf.keras.Model(inputs, outputs)
 model.compile(optimizer="adam", loss="binary_crossentropy", metrics = ["accuracy"])
-model.load_weights("Model_1")
+model.load_weights("Model\Model_1")
 
 
 
@@ -44,3 +44,5 @@ def Predict(imgIndex):
             i += 1
 
 
+if __name__ == "__main__":
+    Predict(28000)

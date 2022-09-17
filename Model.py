@@ -1,9 +1,13 @@
 import tensorflow as tf 
 from Data import Data, IMAGES_DIR, MASK
 import matplotlib.pyplot as plt
+import os
 
+SIZE = (256, 256)
+physical_devices = tf.config.experimental.list_physical_devices('GPU')
+if len(physical_devices) > 0:
+    tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
-SIZE = (200, 200)
 
 def Inppath2Image(path):
     img = tf.io.read_file(path)
@@ -21,7 +25,7 @@ def tarPath2Image(path):
 
 
 data = Data()
-# data.Resize(SIZE)
+
 
 
 train_ds = tf.data.Dataset.from_tensor_slices((data.trainImagePaths, data.trainMaskPaths))
@@ -39,11 +43,11 @@ val_ds = val_ds.map(lambda x, y:(Inppath2Image(x), tarPath2Image(y)), num_parall
 #     ax2.imshow(y)
 #     plt.show()
 
-train_ds = train_ds.batch(16).prefetch(16)
-val_ds = val_ds.batch(16).prefetch(16)
+train_ds = train_ds.batch(4).prefetch(4)
+val_ds = val_ds.batch(4).prefetch(4)
 
 
-inputs = tf.keras.Input(shape=(200, 200, 3))
+inputs = tf.keras.Input(shape=(256, 256, 3))
 x = tf.keras.layers.Rescaling(1./255)(inputs)
 x = tf.keras.layers.Conv2D(32, 3, strides=2, activation="relu", padding="same")(x)
 x = tf.keras.layers.Conv2D(64, 3, activation="relu", padding="same")(x)
@@ -64,5 +68,6 @@ outputs = tf.keras.layers.Conv2D(1, 3, activation="sigmoid",padding="same")(x)
 model = tf.keras.Model(inputs, outputs)
 model.compile(optimizer="adam", loss="binary_crossentropy", metrics = ["accuracy"])
 
+model.load_weights("Model\Model_1")
 
 model.fit(train_ds, validation_data = val_ds, callbacks = [tf.keras.callbacks.ModelCheckpoint("Model\Model_1", save_best_only = True, save_weights_only = True)],  epochs = 30)
