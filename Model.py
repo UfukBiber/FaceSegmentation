@@ -1,73 +1,95 @@
 import tensorflow as tf 
-from Data import Data, IMAGES_DIR, MASK
-import matplotlib.pyplot as plt
 import os
 
-SIZE = (256, 256)
-physical_devices = tf.config.experimental.list_physical_devices('GPU')
-if len(physical_devices) > 0:
-    tf.config.experimental.set_memory_growth(physical_devices[0], True)
 
+BATCH_SIZE = 4
+BUFFER_SIZE = 4 
+VALIDATION_RATIO = 0.2
+EPOCHS = 30
 
-def Inppath2Image(path):
+MODEL_SAVE_DIR = "Model\Model_1"
+
+def InpPathToImg(path):
     img = tf.io.read_file(path)
     img = tf.io.decode_jpeg(img, channels = 3)
-    img = tf.image.resize(img, size = SIZE)
-    img = tf.cast(img, tf.float32) 
-    return img
+    img = tf.image.convert_image_dtype(img, tf.float32)
+    return img 
 
-def tarPath2Image(path):
-    tar = tf.io.read_file(path)
-    tar = tf.io.decode_png(tar, channels = 1)
-    tar = tf.image.resize(tar, size = SIZE)
-    tar = tf.cast(tar, tf.bool)
-    return tar
+def TarPathToImg(path):
+    img = tf.io.read_file(path)
+    img = tf.io.decode_png(img, channels = 1)
+    img = tf.image.convert_image_dtype(img, tf.float32)
+    return img 
 
+def GetPaths(dir):
+    print("Read the %s folder"%dir)
+    paths = os.listdir(dir)
+    for i in range(len(paths)):
+        paths[i] = os.path.join(dir, paths[i])
+    return paths[1000:]
 
-data = Data()
-
-
-
-train_ds = tf.data.Dataset.from_tensor_slices((data.trainImagePaths, data.trainMaskPaths))
-train_ds = train_ds.map(lambda x, y:(Inppath2Image(x), tarPath2Image(y)), num_parallel_calls=4)
-
-val_ds = tf.data.Dataset.from_tensor_slices((data.valImagePaths, data.valMaskPaths))
-val_ds = val_ds.map(lambda x, y:(Inppath2Image(x), tarPath2Image(y)), num_parallel_calls=4)
-
-# for x, y in train_ds.take(30):
-#     print(x.shape)
-#     print(y.shape)
-#     print(y.dtype)
-#     fig, (ax1, ax2) = plt.subplots(2)
-#     ax1.imshow(x)
-#     ax2.imshow(y)
-#     plt.show()
-
-train_ds = train_ds.batch(4).prefetch(4)
-val_ds = val_ds.batch(4).prefetch(4)
+def SplitTrainValidation(paths, ratio):
+    print("Splitted the paths %2f to %2f"%(ratio, 1-ratio))
+    valLength = int(len(paths) * ratio)
+    return paths[valLength:], paths[:valLength]
 
 
-inputs = tf.keras.Input(shape=(256, 256, 3))
-x = tf.keras.layers.Rescaling(1./255)(inputs)
-x = tf.keras.layers.Conv2D(32, 3, strides=2, activation="relu", padding="same")(x)
-x = tf.keras.layers.Conv2D(64, 3, activation="relu", padding="same")(x)
-x = tf.keras.layers.Conv2D(128, 3, strides=2, activation="relu", padding="same")(x)
-x = tf.keras.layers.Conv2D(128, 3, activation="relu", padding="same")(x)
-x = tf.keras.layers.Conv2D(256, 3, strides=2, padding="same", activation="relu")(x)
-x = tf.keras.layers.Conv2D(256, 3, activation="relu", padding="same")(x)
 
-x = tf.keras.layers.Conv2DTranspose(256, 3,  activation="relu", padding="same")(x)
-x = tf.keras.layers.Conv2DTranspose(256, 3, strides=2, activation="relu", padding="same")(x)
-x = tf.keras.layers.Conv2DTranspose(128, 3, activation="relu", padding="same")(x)
-x = tf.keras.layers.Conv2DTranspose(128, 3, strides=2, activation="relu", padding="same")(x)
-x = tf.keras.layers.Conv2DTranspose(64, 3, padding="same", activation="relu")(x)
-x = tf.keras.layers.Conv2DTranspose(32, 3, strides=2, activation="relu", padding="same")(x)
 
-outputs = tf.keras.layers.Conv2D(1, 3, activation="sigmoid",padding="same")(x)
+def GetDataset(InpPaths, TarPaths):
+    print("Preparing the Dataset")
+    ds = tf.data.Dataset.from_tensor_slices((InpPaths, TarPaths))
+    ds = ds.map(lambda x, y:(InpPathToImg(x), TarPathToImg(y)), num_parallel_calls=4)
+    ds = ds.batch(BATCH_SIZE).prefetch(BUFFER_SIZE).shuffle(1024)
+    return ds 
 
-model = tf.keras.Model(inputs, outputs)
-model.compile(optimizer="adam", loss="binary_crossentropy", metrics = ["accuracy"])
 
-model.load_weights("Model\Model_1")
+def GetModel():
+    print("Preparing the Model")
+    inputs = tf.keras.Input(shape=(128, 128, 3))
+    x = tf.keras.layers.Rescaling(1./255)(inputs)
+    x = tf.keras.layers.Conv2D(32, 3, strides=2, activation="relu", padding="same")(x)
+    x = tf.keras.layers.Conv2D(64, 3, activation="relu", padding="same")(x)
+    x = tf.keras.layers.Conv2D(128, 3, strides=2, activation="relu", padding="same")(x)
+    x = tf.keras.layers.Conv2D(128, 3, activation="relu", padding="same")(x)
+    x = tf.keras.layers.Conv2D(256, 3, strides=2, padding="same", activation="relu")(x)
+    x = tf.keras.layers.Conv2D(256, 3, activation="relu", padding="same")(x)
 
-model.fit(train_ds, validation_data = val_ds, callbacks = [tf.keras.callbacks.ModelCheckpoint("Model\Model_1", save_best_only = True, save_weights_only = True)],  epochs = 30)
+    x = tf.keras.layers.Conv2DTranspose(256, 3,  activation="relu", padding="same")(x)
+    x = tf.keras.layers.Conv2DTranspose(256, 3, strides=2, activation="relu", padding="same")(x)
+    x = tf.keras.layers.Conv2DTranspose(128, 3, activation="relu", padding="same")(x)
+    x = tf.keras.layers.Conv2DTranspose(128, 3, strides=2, activation="relu", padding="same")(x)
+    x = tf.keras.layers.Conv2DTranspose(64, 3, padding="same", activation="relu")(x)
+    x = tf.keras.layers.Conv2DTranspose(32, 3, strides=2, activation="relu", padding="same")(x)
+
+    outputs = tf.keras.layers.Conv2D(1, 3, activation="sigmoid",padding="same")(x)
+
+    model = tf.keras.Model(inputs, outputs)
+    model.compile(optimizer="adam", loss="binary_crossentropy", metrics = ["accuracy"])
+    return model 
+
+def LoadWeights(model):
+    try:
+        model.load_weights(MODEL_SAVE_DIR)
+        print("\nLoaded the weights from %s"%MODEL_SAVE_DIR)
+    except:
+        print("\nCould not load the weights\n")
+    finally:
+        return model
+
+
+
+if __name__ == "__main__":
+    inpPaths = GetPaths("IMAGES")
+    tarPaths = GetPaths("MASKS")
+
+    trainInpPaths, valInpPaths = SplitTrainValidation(inpPaths, VALIDATION_RATIO)
+    trainTarPaths, valTarPaths = SplitTrainValidation(tarPaths, VALIDATION_RATIO)
+
+    train_ds = GetDataset(trainInpPaths, trainTarPaths)
+    val_ds = GetDataset(valInpPaths, valTarPaths)
+
+    model = GetModel()
+    model = LoadWeights(model)
+
+    model.fit(train_ds, validation_data = val_ds, callbacks = [tf.keras.callbacks.ModelCheckpoint(MODEL_SAVE_DIR, save_best_only = True, save_weights_only = True)],  epochs = EPOCHS)
