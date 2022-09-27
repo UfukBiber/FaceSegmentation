@@ -1,22 +1,24 @@
 import tensorflow as tf 
 import cv2, os
 import numpy as np
-from Model import GetModel, LoadWeights
-
-
+from Model_2 import GetModel, LoadWeights
+from Input import COLOR_STEP, MASK_NAMES
+IMAGES_DIR = r"C:\Users\biber\OneDrive\Desktop\Data\CelebAMask-HQ\CelebA-HQ-img"
 
 def ShowOutput(model):
     isRunning = True
-    i = 0
+    i = 29000
     while isRunning:
-        img = cv2.imread(os.path.join("TestImages", "%i.jpg"%i))
-        inp = tf.expand_dims(tf.cast(tf.constant(img), tf.float32), 0)
-        output = model.predict(inp)[0]
-        output = np.where(output >= 0.5, 255, 0).astype(np.uint8)
-        cv2.imshow("Mask", output)
-        cv2.imshow("Image", img)
+        path = os.path.join(IMAGES_DIR, "%i.jpg"%i)
+        img = cv2.imread(path)
+        img = cv2.resize(img, (128, 128))
+        img = img.astype(np.float32) / 255.
+        img = tf.expand_dims(img, axis = 0)
+        output = model(img)[0]
+        output = np.argmax(output, axis = -1)
+        output *= COLOR_STEP
+        cv2.imshow("IMAGE", output)
         key = cv2.waitKey(0)
-        
         if (key == ord("q")):
             isRunning = False
         elif (key == ord("n")):
@@ -27,7 +29,7 @@ def ShowOutput(model):
 
 
 if __name__ == "__main__":
-    model = GetModel()
+    model = GetModel(len(MASK_NAMES))
     model = LoadWeights(model)
     ShowOutput(model)
 

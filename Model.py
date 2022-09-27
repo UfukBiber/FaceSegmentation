@@ -7,41 +7,7 @@ BUFFER_SIZE = 4
 VALIDATION_RATIO = 0.2
 EPOCHS = 30
 
-MODEL_SAVE_DIR = "Model\Model_1"
-
-def InpPathToImg(path):
-    img = tf.io.read_file(path)
-    img = tf.io.decode_jpeg(img, channels = 3)
-    img = tf.image.convert_image_dtype(img, tf.float32)
-    return img 
-
-def TarPathToImg(path):
-    img = tf.io.read_file(path)
-    img = tf.io.decode_png(img, channels = 1)
-    img = tf.image.convert_image_dtype(img, tf.float32)
-    return img 
-
-def GetPaths(dir):
-    print("Read the %s folder"%dir)
-    paths = os.listdir(dir)
-    for i in range(len(paths)):
-        paths[i] = os.path.join(dir, paths[i])
-    return paths[1000:]
-
-def SplitTrainValidation(paths, ratio):
-    print("Splitted the paths %2f to %2f"%(ratio, 1-ratio))
-    valLength = int(len(paths) * ratio)
-    return paths[valLength:], paths[:valLength]
-
-
-
-
-def GetDataset(InpPaths, TarPaths):
-    print("Preparing the Dataset")
-    ds = tf.data.Dataset.from_tensor_slices((InpPaths, TarPaths))
-    ds = ds.map(lambda x, y:(InpPathToImg(x), TarPathToImg(y)), num_parallel_calls=4)
-    ds = ds.batch(BATCH_SIZE).prefetch(BUFFER_SIZE).shuffle(1024)
-    return ds 
+MODEL_SAVE_DIR = "Model\Model"
 
 
 def GetModel():
