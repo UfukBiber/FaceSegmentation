@@ -58,8 +58,7 @@ def GetModel(outputLayer):
         previous_block_activation = x  # Set aside next residual
 
     # Add a per-pixel classification layer
-    outputs = tf.keras.layers.Conv2D(outputLayer, 3, activation="softmax", padding="same")(x)
-    outputs += 1e-5
+    outputs = tf.keras.layers.Conv2D(outputLayer+1, 3, activation="softmax", padding="same")(x)
     # Define the model
     model = tf.keras.Model(inputs, outputs)
     return model
