@@ -1,52 +1,41 @@
 import tensorflow as tf 
-from Input import MASK_NAMES, MASK_COLORS, COLOR_STEP, ShowImg
-from Model_2 import GetModel, MODEL_SAVE_DIR, LoadWeights
-import os 
+import Input
+import SimpleModel as sm 
 
-SEED = 3123124
+import UnetModel as um
+
+import UnetModel_2 as um_v2
+
 IMAGES_DIR = r"/home/ufuk/Desktop/CelebAMask-HQ/CelebA-HQ-img"
-MASK_DIR = "MASKS"
+MASK_DIR = r"MASKS"
+BATCH_SIZE = 32
+BUFFER_SIZE = 8
 
-IMAGE_SIZE = (128, 128)
-VAL_RATIO = 0.2
+SIMPLE_MODEL_CALLBACK = tf.keras.callbacks.ModelCheckpoint(sm.Model_Path, save_weights_only=True, save_best_only=True)
 
+UNET_MODEL_CALLBACK = tf.keras.callbacks.ModelCheckpoint(um.Model_Path, save_weights_only=True, save_best_only=True)
 
-def GetPaths(dir):
-    paths = os.listdir(dir)
-    for i in range(len(paths)):
-        paths[i] = os.path.join(dir, paths[i])
-    return paths 
-
-def ReadInpImg(path):
-    img = tf.io.read_file(path)
-    img = tf.io.decode_jpeg(img, channels = 3)
-    img = tf.image.convert_image_dtype(img, dtype = tf.float32)
-    img = img / 255.
-    img = tf.image.resize(img, IMAGE_SIZE)
-    return img 
-
-def ReadTarImg(path):
-    img = tf.io.read_file(path)
-    img = tf.io.decode_jpeg(img, channels = 1)
-    img = tf.squeeze(img, axis = -1)
-    return img 
-
-model = GetModel(len(MASK_NAMES))
+UNET_MODEL_V2_CALLBACK = tf.keras.callbacks.ModelCheckpoint(um_v2.Model_Path, save_weights_only=True, save_best_only=True)
 
 
-inpPaths = GetPaths(IMAGES_DIR)[:1001]
-tarPaths = GetPaths(MASK_DIR)
-train_ds = tf.data.Dataset.from_tensor_slices((inpPaths, tarPaths))
-train_ds = train_ds.map(lambda x, y: (ReadInpImg(x), ReadTarImg(y)), num_parallel_calls = 4)
 
-for inp, tar in train_ds:
-    print(tar)
+if __name__ == "__main__":
+    image_paths = Input.GetPaths(IMAGES_DIR)
+    mask_paths = Input.GetPaths(MASK_DIR)
+    train_ds, val_ds = Input.GetTrainAndValDs(image_paths, mask_paths)
+    train_ds = train_ds.batch(BATCH_SIZE).prefetch(BUFFER_SIZE)
+    val_ds = val_ds.batch(BATCH_SIZE).prefetch(BUFFER_SIZE)
 
-train_ds = train_ds.batch(32)
 
-print(model.summary())
-# if __name__ == "__main__":
-#     model.compile(optimizer = "adam", loss = "sparse_categorical_crossentropy", metrics = ["accuracy"])
-#     model = LoadWeights(model)
-#     model.fit(train_ds, epochs = 10, callbacks = [tf.keras.callbacks.ModelCheckpoint(MODEL_SAVE_DIR, save_weights_only = True)])
-  
+
+    # simple_model = sm.GetModel(len(Input.MASK_NAMES)+1)
+    # # simple_model.load_weights(sm.Model_Path)
+    # simple_model.fit(train_ds, validation_data = val_ds, epochs = 10, callbacks = [SIMPLE_MODEL_CALLBACK])
+
+    # unet_model = um.GetModel(len(Input.MASK_NAMES)+1)
+    # # unet_model.load_weights(um.Model_Path)
+    # unet_model.fit(train_ds, validation_data=val_ds, epochs = 15, callbacks = [UNET_MODEL_CALLBACK])
+
+    unet_model_v2 = um_v2.GetModel(len(Input.MASK_NAMES)+1, (128, 128, 3), 16)
+    unet_model_v2.load_weights(um_v2.Model_Path)
+    unet_model_v2.fit(train_ds, validation_data=val_ds, epochs = 15, callbacks = [UNET_MODEL_V2_CALLBACK])
